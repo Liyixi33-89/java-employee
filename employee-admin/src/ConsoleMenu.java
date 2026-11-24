@@ -6,12 +6,12 @@ import java.util.Scanner;
 /**
  * 控制台菜单：读取选择、分发到对应业务分支、处理非法输入。
  *
- * <p>第二周起「新增/列表/查询」接真实业务；「修改/删除」仍是受控占位，
- * 第三周实现。未实现项明确提示，不冒充成功。
+ * <p>V0.1 第三周：新增/列表/查询/修改/删除全部接通真实业务。
  */
 public class ConsoleMenu {
 
     private static final String LINE = "----------------------------------------";
+    private static final String DELETE_CONFIRM_WORD = "DELETE";
 
     private final Scanner scanner;
     private final PrintStream out;
@@ -57,8 +57,8 @@ public class ConsoleMenu {
             case "1" -> handleCreate();
             case "2" -> handleList();
             case "3" -> handleFind();
-            case "4" -> todo("修改员工");
-            case "5" -> todo("删除员工");
+            case "4" -> handleUpdate();
+            case "5" -> handleDelete();
             case "0" -> running = false;
             case "" -> out.println("输入为空，请输入 0-5 之间的数字。");
             default -> out.println("无效选项：\"" + choice + "\"，请输入 0-5 之间的数字。");
@@ -96,20 +96,93 @@ public class ConsoleMenu {
     }
 
     private void handleFind() {
-        String employeeNo = readLine("要查询的工号: ");
-        if (employeeNo == null) {
+        String no = readLine("要查询的工号: ");
+        if (no == null) {
             return;
         }
-        Optional<Employee> found = service.findByNo(normalize(employeeNo));
+        String employeeNo = normalize(no);
+        Optional<Employee> found = service.findByNo(employeeNo);
         if (found.isPresent()) {
             out.println("查询结果：" + found.get());
         } else {
-            out.println("未找到工号为 \"" + normalize(employeeNo) + "\" 的员工。");
+            out.println("未找到工号为 \"" + employeeNo + "\" 的员工。");
         }
     }
 
-    private void todo(String action) {
-        out.println("[尚未实现] " + action + "：该功能将在第三周实现。");
+    /**
+     * 修改员工：只改姓名，工号作为唯一标识不可变。
+     *
+     * <p>先展示当前记录再让用户输入新姓名，避免"改错人"。
+     * 直接回车保留原姓名，这样只想看看记录的用户不会误清空数据。
+     */
+    private void handleUpdate() {
+        String no = readLine("要修改的工号: ");
+        if (no == null) {
+            return;
+        }
+        String employeeNo = normalize(no);
+
+        // 统一走服务层的"格式 + 存在性"校验，空工号会报"不能为空"而不是"不存在"
+        Employee existing;
+        try {
+            existing = service.requireExisting(employeeNo);
+        } catch (BusinessException e) {
+            out.println("修改失败：" + e.getMessage());
+            return;
+        }
+        out.println("当前记录：" + existing);
+
+        String name = readLine("新姓名（直接回车保持不变）: ");
+        if (name == null) {
+            return;
+        }
+        String newName = normalize(name);
+        if (newName.isEmpty()) {
+            out.println("已取消修改，记录保持不变。");
+            return;
+        }
+        try {
+            Employee updated = service.updateName(employeeNo, newName);
+            out.println("修改成功：" + updated);
+        } catch (BusinessException e) {
+            out.println("修改失败：" + e.getMessage());
+        }
+    }
+
+    /**
+     * 删除员工。需要二次确认，避免误删；
+     * 确认词必须完整输入 DELETE 才算数，其余输入一律视为取消。
+     */
+    private void handleDelete() {
+        String no = readLine("要删除的工号: ");
+        if (no == null) {
+            return;
+        }
+        String employeeNo = normalize(no);
+
+        Employee existing;
+        try {
+            existing = service.requireExisting(employeeNo);
+        } catch (BusinessException e) {
+            out.println("删除失败：" + e.getMessage());
+            return;
+        }
+        out.println("即将删除：" + existing);
+
+        String confirm = readLine("确认删除请输入 " + DELETE_CONFIRM_WORD + "（其他任意输入取消）: ");
+        if (confirm == null) {
+            return;
+        }
+        if (!DELETE_CONFIRM_WORD.equals(normalize(confirm))) {
+            out.println("已取消删除，记录保持不变。");
+            return;
+        }
+        try {
+            Employee removed = service.delete(employeeNo);
+            out.println("删除成功：" + removed);
+        } catch (BusinessException e) {
+            out.println("删除失败：" + e.getMessage());
+        }
     }
 
     /**
