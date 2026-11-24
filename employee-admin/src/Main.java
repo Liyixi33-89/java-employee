@@ -1,16 +1,17 @@
 import java.util.Scanner;
 
 /**
- * 员工后台管理系统 —— 第一周版本（V0.1 起步）。
+ * 员工后台管理系统 —— V0.1 第二周版本。
  *
- * <p>当前只实现菜单循环与输入容错，业务功能（新增/列表/查询/修改/删除）
- * 从第二周开始实现。未实现的功能会明确提示"尚未实现"，不冒充成功。
+ * <p>已实现：员工对象、集合管理、新增/列表/按工号查询，含工号与姓名校验。
+ * 第三周实现修改、删除与更完整的边界处理。
  */
 public class Main {
 
     public static void main(String[] args) {
-        Scanner scanner = new Scanner(System.in);
-        ConsoleMenu menu = new ConsoleMenu(scanner, System.out);
+        Scanner scanner = new Scanner(System.in, java.nio.charset.StandardCharsets.UTF_8);
+        EmployeeService service = new EmployeeService();
+        ConsoleMenu menu = new ConsoleMenu(scanner, System.out, service);
         menu.run();
     }
 }
