@@ -1,0 +1,16 @@
+# 编译产物
+employee-admin/out/
+*.class
+
+# 临时文件
+.session_tmps/
+*.log
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# 操作系统
+Thumbs.db
+desktop.ini
