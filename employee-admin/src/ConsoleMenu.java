@@ -48,6 +48,7 @@ public class ConsoleMenu {
         out.println(" 3. 查询员工");
         out.println(" 4. 修改员工");
         out.println(" 5. 删除员工");
+        out.println(" 6. 按姓名搜索");
         out.println(" 0. 退出");
         out.println(LINE);
     }
@@ -59,9 +60,10 @@ public class ConsoleMenu {
             case "3" -> handleFind();
             case "4" -> handleUpdate();
             case "5" -> handleDelete();
+            case "6" -> handleSearch();
             case "0" -> running = false;
-            case "" -> out.println("输入为空，请输入 0-5 之间的数字。");
-            default -> out.println("无效选项：\"" + choice + "\"，请输入 0-5 之间的数字。");
+            case "" -> out.println("输入为空，请输入 0-6 之间的数字。");
+            default -> out.println("无效选项：\"" + choice + "\"，请输入 0-6 之间的数字。");
         }
     }
 
@@ -182,6 +184,33 @@ public class ConsoleMenu {
             out.println("删除成功：" + removed);
         } catch (BusinessException e) {
             out.println("删除失败：" + e.getMessage());
+        }
+    }
+
+    /**
+     * 按姓名关键词搜索（独立扩展任务）。
+     *
+     * <p>与"查询"区分：查询按工号精确定位单条，搜索按姓名模糊匹配多条。
+     */
+    private void handleSearch() {
+        String keyword = readLine("姓名关键词: ");
+        if (keyword == null) {
+            return;
+        }
+        String trimmed = normalize(keyword);
+        if (trimmed.isEmpty()) {
+            out.println("搜索关键词不能为空。");
+            return;
+        }
+        List<Employee> matched = service.searchByName(trimmed);
+        if (matched.isEmpty()) {
+            out.println("没有姓名包含 \"" + trimmed + "\" 的员工。");
+            return;
+        }
+        out.println("匹配 " + matched.size() + " 条：");
+        int index = 1;
+        for (Employee employee : matched) {
+            out.printf("%d. %s%n", index++, employee);
         }
     }
 

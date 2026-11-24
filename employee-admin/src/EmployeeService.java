@@ -1,6 +1,7 @@
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
@@ -88,6 +89,27 @@ public class EmployeeService {
     /** 全部员工，按新增顺序。返回副本，外部修改不影响内部存储。 */
     public List<Employee> findAll() {
         return new ArrayList<>(store.values());
+    }
+
+    /**
+     * 按姓名关键词模糊搜索（不区分大小写）。
+     *
+     * <p>关键词为空时返回空列表而不是全部——"搜索"语义下，
+     * 空条件通常是用户误操作，静默返回全量会掩盖输入问题。
+     */
+    public List<Employee> searchByName(String keyword) {
+        String trimmed = keyword == null ? "" : keyword.trim();
+        if (trimmed.isEmpty()) {
+            return List.of();
+        }
+        String lower = trimmed.toLowerCase(Locale.ROOT);
+        List<Employee> matched = new ArrayList<>();
+        for (Employee employee : store.values()) {
+            if (employee.getName().toLowerCase(Locale.ROOT).contains(lower)) {
+                matched.add(employee);
+            }
+        }
+        return matched;
     }
 
     /** 按工号查询，找不到返回空。 */
