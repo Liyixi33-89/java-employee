@@ -8,8 +8,10 @@
 它**不是**知识点全集，会漏掉很多"项目用到但主线没经过"的语法。
 
 **知识点全集**请看 [`V0.1-知识点清单.md`](V0.1-知识点清单.md)：
-按路线 §5.1 的六组知识顺序逐条盘点（A JDK/编译 · B 语法 · C 对象 · D 集合 · E 异常/调试 · F Git），
-共 61 项，每项标注代码行号与覆盖状态，另有 7 项路线要求但项目未覆盖的缺口清单。
+按路线 §5.1 的六组知识顺序逐条盘点（A JDK/编译 7 项 · B 语法 18 项 · C 对象 16 项 · D 集合 11 项 · E 异常/调试 10 项 · F Git 7 项），
+共 69 项，每项标注代码位置与覆盖状态；另有 29 道自测题、§7 掌握度自评表。
+
+⚠️ 清单里的 ✅ 只代表"代码里有实现"，**不代表已经掌握**。掌握度看 §7 自评表。
 
 | 想解决什么 | 读哪份 |
 |---|---|
@@ -66,10 +68,15 @@ public static void main(String[] args)
 | `public` | 公开的，JVM 才能调用到 |
 | `static` | 静态的，不需要 `new Main()` 就能调用 |
 | `void` | 不返回任何值 |
-| `main` | 名字是规定死的，不能改 |
+| `main` | 名字和签名都是 JVM 规定死的，不能改（改了 JVM 就找不到入口） |
 | `String[] args` | 命令行参数的字符串数组，本项目用不到 |
 
-> 你可以把 `main` 想成「总开关」。整个程序只有一个总开关。
+> 把 `main` 想成「启动开关」：JVM 启动时只认这一个方法签名。
+>
+> 但**一个项目可以有多个 main**——本项目就有两个：`Main`（主程序）和 `ErrorDrill`（报错练习）。
+> 运行 `java -cp out ErrorDrill` 时，JVM 只执行 `ErrorDrill.main`，`Main.main` 根本不会被加载。
+>
+> 所以准确说法是：**每次启动只有一个 main 被调用，但项目可以有多个 main。**
 
 三行 `new` 分别是什么？
 
@@ -96,16 +103,21 @@ ConsoleMenu menu = new ConsoleMenu(scanner, System.out, service);  // 造一个�
         ↓
 ④ handleCreate()  ← 处理"新增"
         ↓
-⑤ 依次 readLine("工号: ") / readLine("姓名: ")
+⑤ 依次 readLine("工号: ") / readLine("姓名: ") /
+   readLine("入职日期 yyyy-MM-dd（直接回车默认今天）: ")
         ↓
 ⑥ normalize(raw)  ← 清洗输入（去空格、去不可见字符）
         ↓
-⑦ service.create(工号, 姓名)
+⑦ 日期为空 → service.create(工号, 姓名)           ← 重载1，默认今天
+   日期非空 → service.create(工号, 姓名, 日期文本)  ← 重载3，先解析
         ↓
-⑧ requireEmployeeNo() → 校验非空 + 格式 + 是否重复
+⑧ requireEmployeeNo() → 校验非空 + 格式
    requireName()       → 校验非空 + 长度
+   parseDateText()     → 解析 uuuu-MM-dd（严格模式）
+   requireHireDate()   → 校验非空 + 不是未来日期
+   然后 store.containsKey() 判断是否重复
         ↓
-⑨ new Employee(工号, 姓名)  →  store.put(工号, 员工)  ← 存进内存的 Map
+⑨ new Employee(工号, 姓名, 日期)  →  store.put(工号, 员工)  ← 存进内存的 Map
         ↓
 ⑩ 回到 run() 的 while 循环开头，重新打印菜单
 ```
@@ -161,7 +173,29 @@ private final String employeeNo;   // 赋值一次后不能再改
 private String name;               // 可以改
 ```
 
-`final` 字段只能在**构造方法里赋一次值**。所以 `Employee` 创建后工号就固定了，没有任何 `setEmployeeNo` 方法——这不是忘了写，是**故意的设计**。理由见验收记录 §6：工号是外部业务标识，改了历史记录就对不上了。
+`final` 字段**只能被赋值一次**，但赋值的位置有三种：声明处、初始化块、构造方法。本项目用的是构造方法。
+
+```java
+private final String employeeNo;              // 在构造方法里赋值
+private static final String LINE = "----";    // 在声明处赋值
+```
+
+还要分清两件事：
+
+| 说法 | 对不对 |
+|---|---|
+| `final` 字段不能再指向别的对象 | ✅ 对 |
+| `final` 对象的内容也不能改 | ❌ 错 |
+
+```java
+private final List<String> list = new ArrayList<>();
+list.add("x");        // ✅ 允许：改的是对象内容
+list = new ArrayList<>();  // ❌ 编译错误：改的是引用
+```
+
+本项目 `employeeNo` 是 `String`（不可变类），所以"引用不可变"顺带等于"值不可变"——这是 `String` 的特性，不是 `final` 保证的。
+
+所以 `Employee` 创建后工号固定、没有 `setEmployeeNo`，是**故意的设计**。理由见验收记录 §6：工号是外部业务标识，改了历史记录就对不上。
 
 ### 5.3 `Map` 为什么能保证工号唯一
 
@@ -204,7 +238,7 @@ switch (choice) {
     case "1" -> handleCreate();
     case "5" -> handleDelete();
     case "0" -> running = false;
-    case ""  -> out.println("输入为空，请输入 0-6 之间的数字。");
+    case ""  -> out.println("输入为空，请输入 0-8 之间的数字。");
     default  -> out.println("无效选项：\"" + choice + "\"");
 }
 ```
@@ -255,7 +289,7 @@ try {
 **为什么 `extends RuntimeException` 而不是 `Exception`？**
 
 - `RuntimeException`（非受检）：不强制 `try/catch`，调用方想处理就处理。业务规则错误属于这一类。
-- `Exception`（受检）：编译器强制你必须处理，适合「必须处理的意外」，比如文件读不到。
+- `Exception`（受检）：编译器要求你**必须做点什么**——要么 `try/catch` 处理，要么在方法签名上 `throws` 声明"往上层抛"。两种都算处理，不是只有 catch。适合「外部环境意外」，比如文件读不到。
 
 ### 5.7 `Optional` 是什么
 
