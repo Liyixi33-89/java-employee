@@ -1,4 +1,5 @@
 import java.io.PrintStream;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.Scanner;
@@ -6,7 +7,7 @@ import java.util.Scanner;
 /**
  * 控制台菜单：读取选择、分发到对应业务分支、处理非法输入。
  *
- * <p>V0.1 第三周：新增/列表/查询/修改/删除全部接通真实业务。
+ * <p>V0.1 收尾：新增支持入职日期，列表支持按工号/入职日期排序。
  */
 public class ConsoleMenu {
 
@@ -49,6 +50,8 @@ public class ConsoleMenu {
         out.println(" 4. 修改员工");
         out.println(" 5. 删除员工");
         out.println(" 6. 按姓名搜索");
+        out.println(" 7. 按工号排序");
+        out.println(" 8. 按入职日期排序");
         out.println(" 0. 退出");
         out.println(LINE);
     }
@@ -61,9 +64,11 @@ public class ConsoleMenu {
             case "4" -> handleUpdate();
             case "5" -> handleDelete();
             case "6" -> handleSearch();
+            case "7" -> handleSortedByNo();
+            case "8" -> handleSortedByHireDate();
             case "0" -> running = false;
-            case "" -> out.println("输入为空，请输入 0-6 之间的数字。");
-            default -> out.println("无效选项：\"" + choice + "\"，请输入 0-6 之间的数字。");
+            case "" -> out.println("输入为空，请输入 0-8 之间的数字。");
+            default -> out.println("无效选项：\"" + choice + "\"，请输入 0-8 之间的数字。");
         }
     }
 
@@ -76,8 +81,18 @@ public class ConsoleMenu {
         if (name == null) {
             return;
         }
+        String hireDate = readLine("入职日期 yyyy-MM-dd（直接回车默认今天）: ");
+        if (hireDate == null) {
+            return;
+        }
         try {
-            Employee created = service.create(normalize(employeeNo), normalize(name));
+            String no = normalize(employeeNo);
+            String employeeName = normalize(name);
+            String dateText = normalize(hireDate);
+
+            Employee created = dateText.isEmpty()
+                    ? service.create(no, employeeName)          // 重载 1：默认今天
+                    : service.create(no, employeeName, dateText); // 重载 3：字符串日期
             out.println("新增成功：" + created);
         } catch (BusinessException e) {
             out.println("新增失败：" + e.getMessage());
@@ -85,9 +100,21 @@ public class ConsoleMenu {
     }
 
     private void handleList() {
-        List<Employee> employees = service.findAll();
+        printEmployees(service.findAll(), "当前没有员工记录。");
+    }
+
+    private void handleSortedByNo() {
+        printEmployees(service.findAllSortedByNo(), "当前没有员工记录。");
+    }
+
+    private void handleSortedByHireDate() {
+        printEmployees(service.findAllSortedByHireDate(), "当前没有员工记录。");
+    }
+
+    /** 列表输出统一走这里，避免三处各写一遍 printf。 */
+    private void printEmployees(List<Employee> employees, String emptyHint) {
         if (employees.isEmpty()) {
-            out.println("当前没有员工记录。");
+            out.println(emptyHint);
             return;
         }
         out.println("共 " + employees.size() + " 条：");
@@ -124,7 +151,6 @@ public class ConsoleMenu {
         }
         String employeeNo = normalize(no);
 
-        // 统一走服务层的"格式 + 存在性"校验，空工号会报"不能为空"而不是"不存在"
         Employee existing;
         try {
             existing = service.requireExisting(employeeNo);

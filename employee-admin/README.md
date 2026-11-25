@@ -28,8 +28,9 @@ employee-admin/
 ├── src/
 │   ├── Main.java              程序入口，组装依赖
 │   ├── ConsoleMenu.java       菜单循环、输入容错、分支分发
-│   ├── Employee.java          员工模型（工号不可变，作唯一标识）
-│   ├── EmployeeService.java   业务规则 + 内存存储
+│   ├── Employee.java          员工模型（工号与入职日期不可变）
+│   ├── EmployeeService.java   业务规则 + 内存存储 + 排序
+│   ├── ErrorDrill.java        G1 练习：编译错误 / NPE 堆栈阅读
 │   └── BusinessException.java 预期业务错误（区别于程序缺陷）
 ├── build.ps1                  编译并运行
 ├── run-samples.ps1            批量跑边界场景
@@ -60,6 +61,8 @@ Windows 控制台若中文乱码，先执行 `chcp 65001`。
 | R1 | 姓名必填、最多 20 字符 | `EmployeeService.requireName` |
 | — | 工号创建后不可变 | `Employee.employeeNo` 为 `final` |
 | — | 修改/删除先校验格式再校验存在性 | `EmployeeService.requireExisting` |
+| R2 | 入职日期必填、`yyyy-MM-dd`、拒绝未来日期 | `EmployeeService.requireHireDate` |
+| R3 | 工号与入职日期创建后不可变 | `Employee` 对应字段为 `final` |
 
 ## 当前功能
 
@@ -71,6 +74,8 @@ Windows 控制台若中文乱码，先执行 `chcp 65001`。
 | 4 | 修改员工 | 先展示当前记录，只改姓名；直接回车取消 |
 | 5 | 删除员工 | 先展示待删记录，需输入 `DELETE` 二次确认 |
 | 6 | 按姓名搜索 | 姓名关键词模糊匹配，不区分大小写（独立扩展任务） |
+| 7 | 按工号排序 | 工号升序显示，不改内部存储顺序 |
+| 8 | 按入职日期排序 | 日期降序（新人在前） |
 | 0 | 退出 | 或输入流结束（EOF）也会干净退出 |
 
 输入容错：字母、空输入、超范围数字、未知选项、粘贴内容带 BOM 或零宽字符，

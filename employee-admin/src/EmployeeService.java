@@ -1,4 +1,7 @@
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -6,13 +9,9 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * 员工业务规则与内存存储（V0.1 第三周：补全修改与删除）。
+ * 员工业务规则与内存存储。
  *
- * <p>用 {@link LinkedHashMap} 保持插入顺序，工号作键天然保证唯一；
- * 唯一性校验仍然显式做，因为换成数据库后约束由数据库承担，
- * 业务层要保持同一套错误语义。
- *
- * <p>数据只在内存中，进程结束即消失——这是本阶段的边界。
+ * <p>V0.1 收尾：在 CRUD 基础上补入职日期（G6）、排序（G4）。
  */
 public class EmployeeService {
 
@@ -21,30 +20,58 @@ public class EmployeeService {
     /** 姓名长度上限（按字符数，中文姓名足够）。 */
     private static final int NAME_MAX_LENGTH = 20;
 
+    /** 按工号升序。Comparator 是排序规则对象，可复用、可组合。 */
+    private static final Comparator<Employee> BY_NO_ASC =
+            Comparator.comparing(Employee::getEmployeeNo);
+    /** 按入职日期降序：新入职的排在前面。 */
+    private static final Comparator<Employee> BY_HIRE_DATE_DESC =
+            Comparator.comparing(Employee::getHireDate).reversed();
+
     private final Map<String, Employee> store = new LinkedHashMap<>();
 
     /**
-     * 新增员工。
+     * 新增员工（不指定入职日期时默认今天）。这是方法重载。
      *
      * @throws BusinessException 工号为空/格式非法/重复，或姓名为空/过长
      */
     public Employee create(String employeeNo, String name) {
+        return create(employeeNo, name, LocalDate.now());
+    }
+
+    /**
+     * 新增员工（指定入职日期）。
+     *
+     * @throws BusinessException 工号为空/格式非法/重复，姓名为空/过长，
+     *                           或日期格式不是 yyyy-MM-dd / 日期在未来
+     */
+    public Employee create(String employeeNo, String name, LocalDate hireDate) {
         String no = requireEmployeeNo(employeeNo);
         String employeeName = requireName(name);
+        LocalDate date = requireHireDate(hireDate);
 
         if (store.containsKey(no)) {
             throw new BusinessException("工号已存在：\"" + no + "\" 已被 " + store.get(no).getName() + " 使用");
         }
 
-        Employee employee = new Employee(no, employeeName);
+        Employee employee = new Employee(no, employeeName, date);
         store.put(no, employee);
         return employee;
     }
 
     /**
+     * 新增员工（日期以字符串传入）。再一个重载，方便上层直接用用户输入。
+     *
+     * <p>三个同名 create 的存在意义：让调用方按手头有的数据选择，
+     * 编译期就能确定走哪个版本，而不是靠传 null 判断。
+     */
+    public Employee create(String employeeNo, String name, String hireDateText) {
+        return create(employeeNo, name, parseDateText(hireDateText));
+    }
+
+    /**
      * 修改员工。工号不可变，只能改姓名。
      *
-     * <p>这里刻意不提供"改工号"能力：工号是外部约定的业务标识，
+     * <p>刻意不提供"改工号"能力：工号是外部约定的业务标识，
      * 允许改动会让历史引用（将来的审计、关联表）失去意义。
      * 真需要换号，语义上应视为"删除 + 重新建档"。
      *
@@ -92,6 +119,26 @@ public class EmployeeService {
     }
 
     /**
+     * 按工号升序列出。
+     *
+     * <p>排序在 findAll 的**副本**上做，不能改 store 内部顺序——
+     * LinkedHashMap 的插入顺序是"列表按新增次序展示"的保证，
+     * 一旦被排序打乱，下次打开列表顺序就变了。
+     */
+    public List<Employee> findAllSortedByNo() {
+        List<Employee> copy = findAll();
+        copy.sort(BY_NO_ASC);
+        return copy;
+    }
+
+    /** 按入职日期降序列出（新人在前）。同样只在副本上排序。 */
+    public List<Employee> findAllSortedByHireDate() {
+        List<Employee> copy = findAll();
+        copy.sort(BY_HIRE_DATE_DESC);
+        return copy;
+    }
+
+    /**
      * 按姓名关键词模糊搜索（不区分大小写）。
      *
      * <p>关键词为空时返回空列表而不是全部——"搜索"语义下，
@@ -122,6 +169,30 @@ public class EmployeeService {
 
     public int count() {
         return store.size();
+    }
+
+    /**
+     * 解析 yyyy-MM-dd 文本。
+     *
+     * @throws BusinessException 格式不合法
+     */
+    private LocalDate parseDateText(String text) {
+        String value = requireText(text, "入职日期");
+        try {
+            return LocalDate.parse(value, Employee.DATE_FORMAT);
+        } catch (DateTimeParseException e) {
+            throw new BusinessException("日期格式错误：需为 yyyy-MM-dd，当前为 \"" + value + "\"");
+        }
+    }
+
+    private LocalDate requireHireDate(LocalDate hireDate) {
+        if (hireDate == null) {
+            throw new BusinessException("入职日期不能为空");
+        }
+        if (hireDate.isAfter(LocalDate.now())) {
+            throw new BusinessException("入职日期不能是未来日期：" + hireDate.format(Employee.DATE_FORMAT));
+        }
+        return hireDate;
     }
 
     private String requireEmployeeNo(String employeeNo) {
