@@ -6,7 +6,7 @@ Java 学习主线（《01-初级后端工程师（0-1.5年）学习路线》）�
 > ⚠️ **状态：V0.1 功能实现已完成，学习验收未闭环。**
 >
 > - ✅ 代码实现完成：CRUD + 日期 + 排序 + 搜索，9 个场景断言全部通过
-> - ❌ 学习验收待完成：断点走查、知识自测（§3 的 29 道题）、Git 亲手操作、"独立完成搜索功能"的过程需自证
+> - ❌ 学习验收待完成：断点走查、知识自测（§3 的 36 道题）、Git 亲手操作、"独立完成搜索功能"的过程需自证
 >
 > 详见 [docs/V0.1-验收记录.md](docs/V0.1-验收记录.md) 与 [docs/V0.1-知识点清单.md](docs/V0.1-知识点清单.md) §7。
 
@@ -15,7 +15,7 @@ Java 学习主线（《01-初级后端工程师（0-1.5年）学习路线》）�
 | 文档 | 作用 | 什么时候读 |
 |---|---|---|
 | [docs/Java零基础导读.md](docs/Java零基础导读.md) | 单个项目的**纵切**：程序怎么跑起来、一次新增的完整代码路径、语法点的作用 | 第一次接触本项目 |
-| [docs/V0.1-知识点清单.md](docs/V0.1-知识点清单.md) | V0.1 阶段的**横切**：69 个知识点（按组：A7/B18/C16/D11/E10/F7），含 29 道自测题与掌握度自评表 | 想确认"这阶段到底该会什么、我会了多少" |
+| [docs/V0.1-知识点清单.md](docs/V0.1-知识点清单.md) | V0.1 阶段的**横切**：69 个知识点（按组：A7/B18/C16/D11/E10/F7），含 36 道自测题与掌握度自评表 | 想确认"这阶段到底该会什么、我会了多少" |
 | [docs/V0.1-验收记录.md](docs/V0.1-验收记录.md) | 验收矩阵、断点走查步骤、设计取舍复盘 | 阶段结束时 |
 
 > 每个版本都要产出对应的「知识点清单」，不能只有一个通用导读。
@@ -33,12 +33,21 @@ Java 学习主线（《01-初级后端工程师（0-1.5年）学习路线》）�
 ```
 employee-admin/
 ├── src/
-│   ├── Main.java              程序入口，组装依赖
+│   ├── Main.java              程序入口：组装存储 → 服务 → 菜单
 │   ├── ConsoleMenu.java       菜单循环、输入容错、分支分发
 │   ├── Employee.java          员工模型（工号与入职日期不可变）
-│   ├── EmployeeService.java   业务规则 + 内存存储 + 排序
-│   ├── ErrorDrill.java        G1 练习：编译错误 / NPE 堆栈阅读
-│   └── BusinessException.java 预期业务错误（区别于程序缺陷）
+│   ├── EmployeeStore.java     ★ 存储契约（接口）
+│   ├── InMemoryStore.java     ★ 内存实现（LinkedHashMap 保序）
+│   ├── EmployeeService.java   业务规则，只依赖 EmployeeStore 接口
+│   ├── BusinessException.java 预期业务错误（区别于程序缺陷）
+│   ├── pkgdemo/               ★ package 演示（三层包结构）
+│   │   ├── PkgDrill.java
+│   │   ├── model/Student.java
+│   │   └── util/Formats.java
+│   ├── BasicsDrill.java       语法实验 1—9（类型/运算/短路/数组/传参/静态/字符串）
+│   ├── CollectionDrill.java   集合实验 1—8（遍历修改/fail-fast/选型）
+│   ├── OopDrill.java          接口多态最小示例
+│   └── ErrorDrill.java        编译错误 / NPE 堆栈阅读
 ├── build.ps1                  编译并运行
 ├── run-samples.ps1            批量跑边界场景
 └── README.md
@@ -60,7 +69,32 @@ java -Dstdout.encoding=UTF-8 -cp out Main
 
 Windows 控制台若中文乱码，先执行 `chcp 65001`。
 
+## 练习程序怎么跑
+
+主程序是 `Main`；其余是**独立可跑的练习**，互不影响：
+
+```powershell
+# 语法实验：基本类型、运算、短路、数组、传参、静态、字符串
+java -cp out BasicsDrill
+
+# 集合实验：遍历中修改、fail-fast 六组对照、集合选型
+java -cp out CollectionDrill
+
+# 接口与多态：不写接口 vs 写接口、换实现零改动
+java -cp out OopDrill
+
+# 编译错误与 NPE 堆栈阅读
+java -cp out ErrorDrill
+
+# 包与 import（注意主类要写全限定名）
+java -cp out pkgdemo.PkgDrill
+```
+
+> `pkgdemo.PkgDrill` 必须写包名。默认包的类可以直接 `java -cp out Main`，
+> 有包名的类必须写全限定名——这是 `package` 最直接的区别。
+
 ## 业务规则（已实现）
+
 
 | 编号 | 规则 | 实现位置 |
 |---|---|---|
