@@ -35,6 +35,9 @@ public class BasicsDrill {
 
         section("8. static 方法与实例方法的区别");
         staticVsInstance();
+
+        section("9. 字符串常用方法（补漏）");
+        stringMethods();
     }
 
     private static void section(String title) {
@@ -308,6 +311,98 @@ public class BasicsDrill {
         System.out.println("共享的 static 计数 = " + Square.createdCount + "（两个实例共用一份）");
     }
 
+    // ---------- 9. 字符串方法 ----------
+    /**
+     * 字符串常用方法补漏。
+     *
+     * <p>本项目只用到 trim / isEmpty / length / contains / replace / toLowerCase，
+     * 但实际开发里 {@code split} / {@code substring} / {@code indexOf} /
+     * {@code StringBuilder} 出现频率同样高，必须会。
+     *
+     * <p><b>贯穿这一节的核心事实：String 不可变。</b>
+     * 所有"修改"方法都返回<b>新对象</b>，原字符串永远不变。
+     */
+    private static void stringMethods() {
+        String s = "  Hello,World  ";
+
+        System.out.println("原字符串: [" + s + "]  length=" + s.length());
+
+        String t = s.trim();
+        System.out.println("trim()      → [" + t + "]  去掉首尾空白");
+        System.out.println("原字符串仍是: [" + s + "]  ← 不可变，trim 返回的是新对象");
+
+        System.out.println();
+        System.out.println("--- split：按分隔符切成数组 ---");
+        String csv = "E001,张三,2024-03-01";
+        String[] parts = csv.split(",");
+        System.out.println("split(\",\") 得到 " + parts.length + " 段");
+        for (int i = 0; i < parts.length; i++) {
+            System.out.println("  [" + i + "] = " + parts[i]);
+        }
+        System.out.println("⚠️ split 的参数是正则，切 \".\" 要写 \"\\\\.\"（点号在正则里匹配任意字符）");
+        System.out.println("   \"a.b\".split(\".\").length = " + "a.b".split(".").length + "  ← 结果是 0，全被吃掉了");
+        System.out.println("   \"a.b\".split(\"\\\\.\").length = " + "a.b".split("\\.").length + "  ← 正确");
+
+        System.out.println();
+        System.out.println("--- substring：截取子串（左闭右开）---");
+        String date = "2024-03-01";
+        System.out.println("date = " + date);
+        System.out.println("substring(0, 4)  = " + date.substring(0, 4) + "   ← 含下标 0，不含 4");
+        System.out.println("substring(5, 7)  = " + date.substring(5, 7));
+        System.out.println("substring(5)     = " + date.substring(5) + "  ← 只给起点，取到末尾");
+        try {
+            date.substring(0, 100);
+        } catch (StringIndexOutOfBoundsException e) {
+            System.out.println("⚠️ 越界会抛 StringIndexOutOfBoundsException");
+        }
+
+        System.out.println();
+        System.out.println("--- indexOf / lastIndexOf ---");
+        String path = "src/main/java/Main.java";
+        System.out.println("path                = " + path);
+        System.out.println("indexOf(\"/\")       = " + path.indexOf("/") + "   ← 第一次出现");
+        System.out.println("lastIndexOf(\"/\")   = " + path.lastIndexOf("/") + "   ← 最后一次");
+        System.out.println("indexOf(\"xyz\")     = " + path.indexOf("xyz") + "   ← 找不到返回 -1（不是 0）");
+        System.out.println("取文件名: " + path.substring(path.lastIndexOf("/") + 1));
+
+        System.out.println();
+        System.out.println("--- replace / startsWith / endsWith / isEmpty / isBlank ---");
+        System.out.println("replace(\"java\", \"kotlin\") = " + path.replace("java", "kotlin"));
+        System.out.println("startsWith(\"src\")          = " + path.startsWith("src"));
+        System.out.println("endsWith(\".java\")          = " + path.endsWith(".java"));
+        System.out.println("\"\".isEmpty()               = " + "".isEmpty() + "   ← 长度 0");
+        System.out.println("\"   \".isEmpty()            = " + "   ".isEmpty() + "   ← 三个空格，不是空");
+        System.out.println("\"   \".isBlank()            = " + "   ".isBlank() + "   ← isBlank 才认空白（Java 11+）");
+
+        System.out.println();
+        System.out.println("--- StringBuilder：循环里拼接必须用它 ---");
+        // ❌ 反例：循环里用 + 拼接
+        long t1 = System.nanoTime();
+        String bad = "";
+        for (int i = 0; i < 2000; i++) {
+            bad += i;                      // 每次生成新 String，O(n²)
+        }
+        long cost1 = (System.nanoTime() - t1) / 1_000_000;
+
+        // ✅ 正例：StringBuilder
+        long t2 = System.nanoTime();
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 2000; i++) {
+            sb.append(i);                  // 同一个对象上追加
+        }
+        String good = sb.toString();
+        long cost2 = (System.nanoTime() - t2) / 1_000_000;
+
+        System.out.println("用 + 拼接 2000 次:        " + cost1 + " ms");
+        System.out.println("用 StringBuilder 拼接:    " + cost2 + " ms");
+        System.out.println("内容是否相同: " + bad.equals(good));
+        System.out.println("⚠️ 差距随循环次数放大。循环外拼几次用 + 没问题，循环内一律 StringBuilder。");
+
+        System.out.println();
+        System.out.println("--- 为什么本项目可以不 StringBuilder ---");
+        System.out.println("Employee.toString() 里只拼 3 个字段，一次性的，用 + 完全够。");
+        System.out.println("判断标准：拼接发生在循环里吗？循环里 → StringBuilder；否则 → + 更易读。");
+    }
     /** 演示用的小类：静态方法与实例方法的对比。 */
     private static class Square {
         /** static 字段：所有实例共享一份。 */
