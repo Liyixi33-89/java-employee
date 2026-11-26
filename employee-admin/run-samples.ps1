@@ -16,11 +16,15 @@ if (-not (Test-Path out)) {
     throw 'out 目录不存在，请先运行 build.ps1 编译'
 }
 $newestSource = Get-ChildItem src\*.java | Sort-Object LastWriteTime -Descending | Select-Object -First 1
-$oldestClass = Get-ChildItem out\*.class | Sort-Object LastWriteTime | Select-Object -First 1
-if ($oldestClass.LastWriteTime -lt $newestSource.LastWriteTime) {
-    throw "编译产物比源码旧（$($oldestClass.Name) < $($newestSource.Name)），请先重新运行 build.ps1"
+$classFiles = @(Get-ChildItem out\*.class -ErrorAction SilentlyContinue)
+if ($classFiles.Count -eq 0) {
+    throw 'out 目录里没有任何 .class，请先运行 build.ps1 编译'
 }
-Write-Host "编译产物校验通过：$($oldestClass.LastWriteTime) >= $($newestSource.LastWriteTime)" -ForegroundColor DarkGray
+$oldestClass = $classFiles | Sort-Object LastWriteTime | Select-Object -First 1
+if ($oldestClass.LastWriteTime -lt $newestSource.LastWriteTime) {
+    throw "编译产物比源码旧（$($oldestClass.Name) 早于 $($newestSource.Name)），请先重新运行 build.ps1"
+}
+Write-Host "编译产物校验通过：$($oldestClass.Name) $($oldestClass.LastWriteTime) >= $($newestSource.Name) $($newestSource.LastWriteTime)" -ForegroundColor DarkGray
 
 $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 $script:Failures = @()

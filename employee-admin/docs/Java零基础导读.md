@@ -367,6 +367,425 @@ public class FileRepository implements EmployeeRepository { ... }       // 文�
 
 服务层只依赖 `EmployeeRepository` 接口，运行时传入哪个实现就用哪个——**换存储不用改业务代码**。这就是路线 §5.2 的验收项「业务层可以切换内存/文件存储，不重写菜单与全部规则」。
 
+### 5.11 `while` 循环：菜单为什么能一直转
+
+整个程序能反复操作，全靠 `ConsoleMenu.run()` 里这一个循环：
+
+```java
+while (running) {
+    printMenu();                        // 打印菜单
+    String input = readLine("请选择操作: ");
+    if (input == null) break;           // EOF 退出
+    dispatch(normalize(input));         // 分发处理
+}
+out.println("已退出，再见。");
+```
+
+`while` 的规则：**括号里是 `boolean`，为 `true` 就重复执行循环体，为 `false` 就往下走。**
+
+这个循环能停，靠两处：
+
+| 退出方式 | 触发 | 代码 |
+|---|---|---|
+| 用户选 0 | `dispatch("0")` 把 `running` 改成 `false` | `case "0" -> running = false;` |
+| 输入流结束 | `readLine` 返回 `null` | `if (input == null) break;` |
+
+**为什么 `running` 是成员变量而不是局部变量？**
+
+```java
+private boolean running = true;      // 成员变量：dispatch() 能改到
+```
+
+如果写成 `run()` 里的局部变量，`dispatch()` 是另一个方法，**看不到也改不了它**——循环永远停不下来。这是"为什么需要成员变量"最直接的一个例子。
+
+**`while` vs `for` 怎么选**：
+
+| 场景 | 用哪个 | 理由 |
+|---|---|---|
+| 次数已知（遍历数组） | `for` | 循环变量（下标）写在头部，一目了然 |
+| 次数未知、靠条件停 | `while` | 停止条件就是业务条件本身 |
+| 至少执行一次 | `do-while` | 菜单其实更适合 `do-while`，本项目用 `while` 是为了显式判断 EOF |
+
+> **自己改一次**：把 `while (running)` 改成 `while (true)`，再把 `case "0"` 改成 `running = false; return;`。
+> 猜猜会怎样？（答案：也能跑，但 `while (true)` 隐藏了退出条件，读代码的人必须翻遍整个方法才知道怎么退出——这是可读性倒退。）
+
+### 5.12 方法：定义、参数、返回值、`void`
+
+```java
+//  private  static  void      printEmployees  (List<Employee> employees, String emptyHint)
+//    ①       ②     ③            ④              ⑤                                 ⑤
+```
+
+| 位置 | 名称 | 含义 |
+|---|---|---|
+| ① | 访问修饰符 | `private` 只有本类能调；`public` 外部能调 |
+| ② | `static` | 有 → 属于类；无 → 属于对象（见 5.13） |
+| ③ | 返回类型 | `void` 表示不返回；否则必须 `return` 一个该类型的值 |
+| ④ | 方法名 | 驼峰命名，动词开头 |
+| ⑤ | 参数列表 | 可以没有，可以多个，用逗号分隔 |
+
+**`return` 的两个作用**（容易只记住第一个）：
+
+```java
+private String requireText(String value, String fieldName) {
+    String trimmed = value == null ? "" : value.trim();
+    if (trimmed.isEmpty()) {
+        throw new BusinessException(fieldName + "不能为空");   // 抛异常也是"提前结束"
+    }
+    return trimmed;                                          // ① 结束方法 ② 带回一个值
+}
+```
+
+**`void` 方法里的 `return;`** 只表示"提前结束"，不带值：
+
+```java
+private void handleCreate() {
+    String employeeNo = readLine("工号: ");
+    if (employeeNo == null) {
+        return;              // 输入结束了，直接退出方法，不往下走
+    }
+    // ...
+}
+```
+
+> **不看代码回答**：`handleCreate()` 里为什么 `employeeNo == null` 要 `return`？
+> （答案：`null` 表示输入流已结束，继续读姓名会读到 `null` 或者死循环，所以要提前退出。）
+
+**参数是"按值传递"**（这是最重要的一个概念，`BasicsDrill.passByValue()` 有完整实验）：
+
+```java
+int num = 10;
+changeInt(num);          // 传的是 10 这个值的副本
+// num 仍然是 10，因为方法里改的是副本
+
+StringBuilder sb = new StringBuilder("原始");
+changeContent(sb);       // 传的是"地址"的副本，但地址指向同一个对象
+// sb 变成"原始被修改"，因为通过地址改到了对象内容
+```
+
+一句话：**基本类型传值，对象传地址的副本。所以「改内容」外部能看到，「改指向」外部看不到。**
+
+### 5.13 `static` 方法 vs 实例方法
+
+```java
+// 实例方法：需要 this，能访问实例字段
+String describe() {
+    return "边长 " + this.side;
+}
+
+// 静态方法：没有 this，只能访问参数和静态字段
+static int area(int side) {
+    return side * side;
+}
+```
+
+| | 静态方法 | 实例方法 |
+|---|---|---|
+| 调用方式 | `Square.area(3)` | `sq.describe()` |
+| 需要 `new` 吗 | 不需要 | 需要 |
+| 能用 `this` 吗 | **不能** | 能 |
+| 能读实例字段吗 | **不能** | 能 |
+| 典型例子 | `Math.abs()`、`Integer.parseInt()`、`main()` | `employee.getName()` |
+
+**为什么 `main` 必须是 `static`？**
+
+JVM 启动时**还没有任何对象**。它要做的第一件事就是调用 `main`，
+此时没有 `Main` 的实例，所以只能用 `Main.main(...)` 这种"属于类"的调用方式 →
+`main` 必须是 `static`。
+
+**同理，为什么 `ConsoleMenu.printMenu()` 不是 `static`？**
+
+因为它要访问 `this.out`（每个菜单对象自己的输出流）。如果写成 `static`，
+编译器会报「无法从静态上下文引用非静态变量 out」。
+
+> **判断口诀**：方法里用到了 `this.xxx` 或实例字段 → 不能 `static`；
+> 只依赖参数 → 可以 `static`（且通常应该加，因为更容易测）。
+
+### 5.14 `print` / `println` / `printf` / `flush`
+
+```java
+out.print("请选择操作: ");                    // 不换行
+out.println("=== 员工后台管理系统 ===");       // 换行
+out.printf("%d. %s%n", index++, employee);    // 格式化 + 换行
+out.flush();                                  // 把缓冲区推出去
+```
+
+**`print` vs `println`**：区别只有一个——末尾加不加换行符。
+菜单提示「请选择操作: 」用 `print`，因为光标要停在同一行等用户输入。
+
+**`printf` 的占位符**：
+
+| 占位符 | 用于 | 例子 |
+|---|---|---|
+| `%d` | 整数 | `%d` → `1` |
+| `%s` | 任何对象（自动调 `toString()`） | `%s` → `E001  张三  入职:2024-03-01` |
+| `%f` | 浮点 | `%.2f` → `3.14` |
+| `%n` | 平台相关的换行符 | 等价于 `println` 的那个换行 |
+
+`printf` **不自动换行**，所以本项目每处都写了 `%n`。忘了加 → 所有记录连成一行。
+
+**`flush()` 到底解决什么？**
+
+先说清楚 `System.out` 的性质：它是 `PrintStream`，**自动刷新的**。
+它的 `println` 会自动 flush，`print` 则在遇到换行符或缓冲区满时刷新。
+
+所以在本项目的实际场景里（输出到控制台、有大量 `println`），
+**去掉 `out.flush()` 后行为完全一样**——我实际做过这个实验：
+临时删掉 `flush()` 重新编译，`run-samples.ps1` 的 9 个场景全部照旧 PASS。
+
+那为什么还留着？因为它防的是另一种情况：
+
+| 场景 | 不加 `flush()` 的后果 |
+|---|---|
+| 输出重定向到文件、且用 `print` 且长时间不换行 | 内容可能滞留在缓冲区，进程被强杀时丢失 |
+| 输出流被包装成不带自动刷新的缓冲流 | 提示可能不显示 |
+| 期望"打印即生效"的调试场景 | 日志顺序错乱 |
+
+本项目里它是**防御性写法**，不是必需。诚实的说法是：
+
+> `flush()` 在这里的作用是「显式保证提示先于输入显示」，
+> 在控制台场景下 `PrintStream` 已自动处理，删掉不影响结果。
+> 真正需要它的是重定向输出、或用 `BufferedWriter` 这类需要手动刷新的流。
+
+（顺带一句：`printf` 不会自动刷新，这也是某些场景下加 `flush()` 的理由。）
+
+> **自己验一次**：把 `readLine()` 里的 `out.flush();` 删掉，跑 `run-samples.ps1`，
+> 你会发现 9 个场景仍然全过。**这个"实验没有变化"的结论本身比"它很重要"更有价值**——
+> 说明不能凭直觉判断某个 API 的作用，要实测。（改完记得加回来。）
+
+### 5.15 重写 `toString`：为什么 `println(employee)` 能直接打印
+
+```java
+Employee employee = new Employee("E001", "张三", LocalDate.now());
+System.out.println(employee);
+// 输出：E001  张三  入职:2026-11-26
+```
+
+你没写 `.getName()`，它怎么知道打什么？因为 `println` 内部对参数调用了 `toString()`。
+
+**如果没重写 `toString`，输出是什么？**
+
+```
+Employee@1b6d3586
+```
+
+`类名@十六进制哈希码`——完全看不出内容。这就是为什么必须重写。
+
+**重写的本质**：`toString()` 定义在 `Object` 里（所有类的老祖宗），
+默认实现就是打印那个哈希码。重写 = 用你自己的版本覆盖它。
+
+```java
+@Override
+public String toString() {
+    return employeeNo + "  " + name + "  入职:" + hireDate.format(DATE_FORMAT);
+}
+```
+
+**这也顺带解释了字符串拼接**（知识点 `B12`）：
+
+```java
+out.println("新增成功：" + created);
+```
+
+`"新增成功：" + created` 里，`created` 不是 `String`，Java 会自动调用它的 `toString()`
+拼到后面。**所以「对象能直接拼字符串」和「println 能直接打印对象」是同一个机制。**
+
+**`@Override` 为什么必须有**（知识点 `C10`）：
+
+```java
+@Override
+public String toString() { ... }        // 拼错成 toSting() → 编译报错 ✅
+
+public String toSting() { ... }         // 没有 @Override → 编译通过，但方法永远不被调用 ❌
+```
+
+`@Override` 让编译器帮你核对"这个方法真的覆盖了父类的同名方法吗"。不加的话，
+拼错方法名编译器不会报错，你会得到一个**永远不会被调用的死方法**，然后花几小时找为什么打印不对。
+
+> **这是最值得养成习惯的一个注解**：凡是覆盖父类方法，一律加 `@Override`。
+
+`equals` 和 `hashCode` 同理，本项目 `Employee` 里三处都加了：
+
+```java
+@Override public boolean equals(Object o) { ... }
+@Override public int hashCode() { ... }
+@Override public String toString() { ... }
+```
+
+### 5.16 三元表达式：一行写完 if-else
+
+```java
+String trimmed = value == null ? "" : value.trim();
+//                              ↑条件   ↑真   ↑假
+```
+
+等价于：
+
+```java
+String trimmed;
+if (value == null) {
+    trimmed = "";
+} else {
+    trimmed = value.trim();
+}
+```
+
+**读法**：`条件 ? 值为真时 : 值为假时`。问号前是条件，冒号分隔两个结果。
+
+**什么时候用**：只在「二选一、且两边都只是一表达式」时用。本项目 `requireText` 和
+`searchByName` 两处都用它处理 `null`：
+
+```java
+String trimmed = keyword == null ? "" : keyword.trim();
+```
+
+**什么时候别用**：嵌套三元。下面这种可读性极差，不如写 `if`：
+
+```java
+// ❌ 别这么写
+String level = score > 90 ? "A" : score > 80 ? "B" : score > 60 ? "C" : "D";
+```
+
+**为什么这里要特判 `null`？**
+
+```java
+value.trim()      // value 是 null → NullPointerException
+```
+
+`null` 上不能调任何方法。`null == x` 只能靠 `==` 判断，不能 `value.equals(null)`
+（因为 `value` 本身就是 `null`，调 `equals` 会先崩）。
+
+> **注意顺序**：`value == null ? "" : value.trim()` 里，如果 `value` 为 `null`，
+> 冒号后的 `value.trim()` **不会执行**——三元表达式也是"短路"的。
+
+### 5.17 `printf` 格式化输出
+
+```java
+out.printf("%d. %s%n", index++, employee);
+```
+
+| 部分 | 含义 |
+|---|---|
+| `"%d. %s%n"` | 格式模板 |
+| `index++` | 第一个参数，填 `%d` |
+| `employee` | 第二个参数，填 `%s` |
+| `%n` | 换行（平台相关） |
+
+**参数按顺序填坑**，不是按名字。所以占位符个数必须和参数个数一致，否则运行时抛
+`MissingFormatArgumentException`。
+
+| 占位符 | 类型 | 示例输出 |
+|---|---|---|
+| `%d` | 整数（`int`/`long`） | `1` |
+| `%s` | 任意对象（自动 `toString()`） | `E001  张三  入职:2024-03-01` |
+| `%f` | 浮点，`%.2f` 保留两位 | `3.14` |
+| `%n` | 换行 | — |
+| `%%` | 一个百分号 | `%` |
+
+**`printf` 不自动换行**。本项目每处都写了 `%n`，忘了加 → 所有记录连成一行。
+
+**为什么不直接拼字符串？**
+
+```java
+out.println(index++ + ". " + employee);                    // 可以
+out.printf("%d. %s%n", index++, employee);                 // 更清楚
+```
+
+差异在多列对齐时体现：`printf` 支持 `%-10s`（左对齐补空格到 10 位）这类格式控制，
+拼字符串做不到。本项目的 `printEmployees` 选 `printf`，就是为了以后加列对齐时不用重写。
+
+### 5.18 `ArrayList` 与 `List` 接口：左边为什么写接口
+
+```java
+public List<Employee> findAll() {
+    return new ArrayList<>(store.values());     // 左边 List，右边 ArrayList
+}
+```
+
+**`List` 是接口，`ArrayList` 是实现。** 这一行同时有两个信息：
+
+| 位置 | 写了什么 | 含义 |
+|---|---|---|
+| 返回类型 | `List` | 「我给你一个**有序集合**」，不承诺底层是数组还是链表 |
+| 实际对象 | `ArrayList` | 「内部我用数组实现」，调用方不该关心 |
+
+**为什么返回类型不直接写 `ArrayList`？**
+
+```java
+// 假设写成 ArrayList
+public ArrayList<Employee> findAll() { ... }
+```
+
+后果：调用方代码里可能会写 `ArrayList<Employee> list = service.findAll();`。
+哪天内部改用 `LinkedList`（比如频繁中间插入），返回类型一改，
+**所有调用方全部编译失败**。写接口类型就不会——`LinkedList` 也是 `List`。
+
+这就是「**面向接口编程**」最朴素的一次应用。V0.2 抽 `EmployeeRepository` 是同一个道理，
+只是从「集合接口」升级到「自己的业务接口」。
+
+**`new ArrayList<>(store.values())` 的构造参数是什么？**
+
+`ArrayList` 有个构造方法接收任何 `Collection`，把它里面的元素复制进来：
+
+```java
+new ArrayList<>()               // 空列表
+new ArrayList<>(store.values()) // 把 Map 的所有值复制进来
+new ArrayList<>(anotherList)    // 复制另一个 List
+```
+
+**为什么必须复制**（知识点 `D10` 防御性拷贝）：
+
+```java
+// 如果不复制，直接暴露内部集合
+public List<Employee> findAll() {
+    return (List<Employee>) store.values();   // ❌
+}
+```
+
+调用方一句 `list.clear()` 就把**内部数据清空了**。`new ArrayList<>(...)` 产生新列表，
+外部怎么改都不影响 `store`。
+
+> **但要注意这是浅拷贝**：复制的是"引用的列表"，元素还是同一个 `Employee` 对象。
+> 调用方 `employee.setName("新名")` 仍然会改到存储里的对象。
+> 真要隔离，得连对象一起复制（深拷贝）——本阶段不需要，`updateName` 正是靠对象引用工作的。
+
+### 5.19 两种查找：`findByNo` vs `searchByName`
+
+项目里有两个"找员工"的方法，用途完全不同：
+
+| | `findByNo` | `searchByName` |
+|---|---|---|
+| 匹配方式 | 精确（工号完全相等） | 模糊（姓名包含关键词） |
+| 返回 | `Optional<Employee>` 单条 | `List<Employee>` 多条 |
+| 底层 | `store.get(key)` 直接定位 | 遍历全部逐个比较 |
+| 复杂度 | O(1) | O(n) |
+| 菜单 | 3 查询员工 | 6 按姓名搜索 |
+
+**为什么 `findByNo` 用 `Map.get` 而不是遍历？**
+
+因为 `Map` 的键就是工号，`get` 走哈希，一步到位。遍历 10000 条记录找一条，
+和直接 `get` 一次，差距是数量级的。
+
+**这就是"选对数据结构"的意义**：同样叫"查找"，放进 `Map` 当键，和放在 `List` 里遍历，
+代码看起来差不多，性能差很多。
+
+**为什么 `searchByName` 只能遍历？**
+
+因为 `Map` 的键是工号，不是姓名。名字不是唯一键（可能有重名），无法当 `Map` 的键。
+要按姓名查，只能扫一遍。
+
+> **如果姓名搜索变成高频操作怎么办？**
+> 常见做法是再建一个 `Map<String, List<Employee>>` 作索引（姓名 → 同名的人）。
+> 这是空间换时间，V0.3 引入数据库后由索引解决，现在不必过度设计。
+> 但要**知道有这个问题**——这是"为什么需要索引"的起点。
+
+**为什么返回类型不同？**
+
+- `findByNo` 最多一条 → `Optional<Employee>`（可能没有）
+- `searchByName` 可能 0 条、1 条、多条 → `List<Employee>`（空列表表示没有）
+
+`Optional` 表达"单个可能不存在"，`List` 表达"集合可能为空"——**类型本身就说明了语义**。
+
 ## 6. 现在就该动手做的三件事
 
 ### 6.1 亲手跑一遍，并故意弄错
