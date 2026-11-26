@@ -1,17 +1,18 @@
 import java.time.LocalDate;
-import java.time.format.DateTimeParseException;
-import java.util.ArrayList;
+import java.time.format.DateTimeParseException;import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Optional;
 
 /**
  * 员工业务规则与内存存储。
  *
  * <p>V0.1 收尾：在 CRUD 基础上补入职日期（G6）、排序（G4）。
+ *
+ * <p><b>存储被抽成 {@link EmployeeStore} 接口</b>（C13/C14 落地）：
+ * 本类只依赖接口，不关心数据在内存还是文件里。V0.2 加文件实现时，
+ * 这里一行都不用改——这就是「面向接口编程」的实际价值。
  */
 public class EmployeeService {
 
@@ -26,8 +27,23 @@ public class EmployeeService {
     /** 按入职日期降序：新入职的排在前面。 */
     private static final Comparator<Employee> BY_HIRE_DATE_DESC =
             Comparator.comparing(Employee::getHireDate).reversed();
+    /** 只依赖接口。构造时传入具体实现，见 {@link Main}。 */
+    private final EmployeeStore store;
 
-    private final Map<String, Employee> store = new LinkedHashMap<>();
+    /** 无参构造：默认用内存存储，方便现有调用方与测试。 */
+    public EmployeeService() {
+        this(new InMemoryStore());
+    }
+
+    /**
+     * 由外部决定用哪种存储。
+     *
+     * <p>参数类型是接口 {@link EmployeeStore}，所以传内存版、文件版、
+     * 甚至测试用的假实现都可以——调用方代码完全一致。
+     */
+    public EmployeeService(EmployeeStore store) {
+        this.store = store;
+    }
 
     /**
      * 新增员工（不指定入职日期时默认今天）。这是方法重载。
@@ -112,10 +128,9 @@ public class EmployeeService {
         }
         return existing;
     }
-
-    /** 全部员工，按新增顺序。返回副本，外部修改不影响内部存储。 */
+    /** 全部员工，按新增顺序。存储实现负责返回副本。 */
     public List<Employee> findAll() {
-        return new ArrayList<>(store.values());
+        return store.findAll();
     }
 
     /**
@@ -148,10 +163,9 @@ public class EmployeeService {
         String trimmed = keyword == null ? "" : keyword.trim();
         if (trimmed.isEmpty()) {
             return List.of();
-        }
-        String lower = trimmed.toLowerCase(Locale.ROOT);
+        }        String lower = trimmed.toLowerCase(Locale.ROOT);
         List<Employee> matched = new ArrayList<>();
-        for (Employee employee : store.values()) {
+        for (Employee employee : store.findAll()) {
             if (employee.getName().toLowerCase(Locale.ROOT).contains(lower)) {
                 matched.add(employee);
             }
